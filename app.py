@@ -1,22 +1,44 @@
-import flask
+from flask import Flask, request, jsonify, send_from_directory
 import pickle
-import pandas as pd
-with open(f'model/USA_Housing_Model.pkl', 'rb') as f:
-    model = pickle.load(f)
-app = flask.Flask(__name__, template_folder='templates')
+import numpy as np
 
-@app.route('/', methods=['GET', 'POST'])
-def main():
-    if flask.request.method == 'GET':
-       return(flask.render_template('index.html')) 
-    if flask.request.method == 'POST':
-       aai = flask.request.form['aai']
-       aah = flask.request.form['aah']
-       aan = flask.request.form['aan']
-       aanb = flask.request.form['aanb']
-       ap = flask.request.form['ap']
-       input_variables = pd.DataFrame([[aai,aah,aan,aanb,ap]],columns=['Avg. Area Income','Avg. Area House Age','Avg. Area Number of Rooms','Avg. Area Number of Bedrooms','Area Population'],dtype=float,index=['input'])
-       prediction = model.predict(input_variables)[0]
-       return flask.render_template('index.html',original_input={'Avg. Area Income':aai,'Avg. Area House Age':aah,'Avg. Area Number of Rooms':aan,'Avg. Area Number of Bedrooms':aanb,'Area Population':ap},result=prediction)
+app = Flask(__name__, static_folder='static', static_url_path='')
+
+# Load the trained model
+with open('house_price_model.pkl', 'rb') as file:
+    model = pickle.load(file)
+
+@app.route('/')
+def index():
+    return send_from_directory('', 'index.html')
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        # Extract the input data from the request
+        data = request.get_json(force=True)
+        
+        # Extract features from the JSON data
+        area = float(data['Area'])
+        bedrooms = float(data['Bedrooms'])
+        bathrooms = float(data['Bathrooms'])
+        floors = float(data['Floors'])
+        age = float(data['Age'])
+        garage = 1 if data['Garage'].lower() == 'yes' else 0
+        lot_size = float(data['Lot Size'])
+        garden = 1 if data['Garden'].lower() == 'yes' else 0
+        
+        # Prepare the feature array for prediction
+        features = np.array([[area, bedrooms, bathrooms, floors, age, garage, lot_size, garden]])
+        
+        # Make prediction
+        prediction = model.predict(features)
+        
+        # Return the result as JSON
+        return jsonify({'Predicted Price': prediction[0]})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 if __name__ == '__main__':
-   app.run()
+    app.run(debug=True)
